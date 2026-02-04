@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ro">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Belot Auto Tracker</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header" hidden>
+        <div class="title">Belot Auto Tracker</div>
+        <div class="subtitle">Stocare locală • Auto‑citire în tabul activ (opțional)</div>
+      </header>
+
+      <section id="autoPanel" class="panel" hidden>
+        <div class="row row-top">
+          <div>
+            <div class="section-title">Rămase</div>
+            <div class="section-subtitle">Pachet belot de 32</div>
+          </div>
+          <button id="resetBtn" class="btn btn-danger" type="button">Resetare</button>
+        </div>
+
+        <div class="remaining">
+          <div class="remaining-total">
+            <span id="remainingTotal" class="remaining-number">32</span>
+            <span class="remaining-max">/32</span>
+          </div>
+          <div id="suitBreakdown" class="suit-breakdown" aria-label="Rămase pe suită"></div>
+        </div>
+
+        <div class="row row-controls">
+          <label class="toggle">
+            <input id="preventDuplicatesToggle" type="checkbox" checked />
+            <span>Fără duplicate</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel panel-main">
+        <div class="row row-top">
+          <div>
+            <div class="section-title">Adaugă cărți văzute</div>
+            <div class="section-subtitle">Apasă o carte pentru a adăuga</div>
+          </div>
+          <div class="row">
+            <button id="calibrateBtn" class="btn" type="button">Calibrare</button>
+            <button id="resetBtnMain" class="btn btn-danger" type="button">Resetare</button>
+          </div>
+        </div>
+
+        <div class="trump-row" aria-label="Coz">
+          <div class="trump-label">Coz</div>
+          <div id="trumpOptions" class="trump-options" role="group" aria-label="Alege cozul">
+            <button class="trump-btn" type="button" data-suit="S" title="Pică">♠</button>
+            <button class="trump-btn" type="button" data-suit="H" title="Inimă">♥</button>
+            <button class="trump-btn" type="button" data-suit="D" title="Caro">♦</button>
+            <button class="trump-btn" type="button" data-suit="C" title="Treflă">♣</button>
+          </div>
+        </div>
+
+        <div id="deckGrid" class="deck" aria-label="Pachet belot"></div>
+
+        <div id="calibrationPanel" class="calibration" hidden>
+          <div class="row row-top">
+            <div>
+              <div class="section-title">Calibrare</div>
+              <div id="calibrationSubtitle" class="section-subtitle">Mapează imaginile cărților o singură dată</div>
+            </div>
+            <button id="calibrationCloseBtn" class="btn" type="button">Închide</button>
+          </div>
+
+          <div class="calibration-meta">
+            <div id="calibrationIndex" class="pill">—</div>
+            <div id="calibrationToken" class="mono"></div>
+          </div>
+
+          <img id="calibrationImg" class="calibration-img" alt="Carte calibrare" />
+
+          <div class="hint">Apasă cartea corectă din grilă pentru a salva maparea.</div>
+
+          <div class="row">
+            <button id="calibrationPrevBtn" class="btn" type="button">Înapoi</button>
+            <button id="calibrationEditBtn" class="btn" type="button">Editează</button>
+            <button id="calibrationNextBtn" class="btn" type="button">Înainte</button>
+            <button id="calibrationSkipBtn" class="btn" type="button">Sari</button>
+          </div>
+
+          <div id="calibrationStatus" class="status" aria-live="polite"></div>
+        </div>
+
+        <details class="details debug-details">
+          <summary class="details-summary">Depanare</summary>
+          <div class="details-body">
+            <div class="row">
+              <button id="debugToggleAdvancedBtn" class="btn" type="button">Avansat</button>
+              <button id="debugCopyBtn" class="btn" type="button">Copiază</button>
+              <button id="debugClearMapBtn" class="btn btn-danger" type="button">Șterge maparea</button>
+              <button id="debugClearBtn" class="btn" type="button">Golește</button>
+            </div>
+            <div id="debugStatus" class="status" aria-live="polite"></div>
+            <div class="hint">Token-uri nemapate (apasă unul, apoi cartea corectă în grilă):</div>
+            <div id="unmappedTokens" class="token-list" aria-label="Token-uri nemapate"></div>
+            <pre id="debugLog" class="debug-log"></pre>
+          </div>
+        </details>
+      </section>
+
+      <section class="panel" hidden>
+        <div class="row row-top">
+          <div>
+            <div class="section-title">Auto din pagină</div>
+            <div class="section-subtitle">Citește cărțile din tab-ul curent (opțional)</div>
+          </div>
+        </div>
+
+        <div class="row row-controls">
+          <label class="toggle">
+            <input id="autoReadEnabledToggle" type="checkbox" />
+            <span>Activează auto‑citirea</span>
+          </label>
+          <div class="hint-inline">Doar tab-ul activ</div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">Selector CSS (cărți jucate)</div>
+          <input
+            id="autoReadSelector"
+            class="input"
+            type="text"
+            placeholder="#js__gameplay-page .table__cards"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <div class="hint">Sfat: alege elementul care conține doar cărțile de pe masă.</div>
+        </div>
+
+        <div class="row">
+          <button id="autoStartBtn" class="btn" type="button">Pornește / Rescanează</button>
+          <button id="autoStopBtn" class="btn" type="button">Oprește</button>
+        </div>
+
+        <div id="autoStatus" class="status" role="status" aria-live="polite"></div>
+
+        <div class="divider"></div>
+
+        <div class="field">
+          <div class="field-label">Învață maparea (pentru cărți doar ca imagini)</div>
+          <div class="hint">
+            Unele site‑uri afișează cărțile ca imagini <span class="mono">/deck_5/13.png</span>. Folosește captură și
+            apasă cartea corectă în grilă pentru a învăța extensia.
+          </div>
+        </div>
+
+        <div class="row wrap">
+          <button id="captureStartBtn" class="btn" type="button">Capturează</button>
+          <button id="captureStopBtn" class="btn" type="button">Oprește captura</button>
+          <button id="cancelMappingBtn" class="btn" type="button">Anulează</button>
+          <button id="clearMappingBtn" class="btn btn-danger" type="button">Șterge maparea</button>
+          <div id="mappingCountPill" class="pill" title="Token-uri mapate">0 mapate</div>
+        </div>
+
+        <div id="capturedToken" class="token" hidden></div>
+        <div id="mappingStatus" class="status" role="status" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" hidden>
+        <div class="row row-top">
+          <div>
+            <div class="section-title">Văzute</div>
+            <div id="seenCount" class="section-subtitle"></div>
+          </div>
+        </div>
+
+        <input
+          id="seenFilter"
+          class="input"
+          type="search"
+          placeholder="Caută văzute… (ex: ♠A, 10, inimi)"
+          autocomplete="off"
+          spellcheck="false"
+        />
+
+        <div id="seenList" class="seen-list" aria-label="Listă cărți văzute"></div>
+      </section>
+
+      <section class="panel" hidden>
+        <details class="details">
+          <summary class="details-summary">Export / Import JSON</summary>
+          <div class="details-body">
+            <div class="row">
+              <button id="exportBtn" class="btn" type="button">Exportă</button>
+              <button id="importBtn" class="btn" type="button">Importă</button>
+            </div>
+            <textarea
+              id="jsonArea"
+              class="textarea"
+              placeholder='{"seen":["S7","HA"],"settings":{"preventDuplicates":true}}'
+              spellcheck="false"
+            ></textarea>
+            <div id="ioStatus" class="status" role="status" aria-live="polite"></div>
+          </div>
+        </details>
+      </section>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

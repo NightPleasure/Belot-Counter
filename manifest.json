@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Belot Auto Tracker",
+  "version": "1.0.0",
+  "description": "Track seen cards in a 32-card belot deck (side panel). Active-tab auto-read with local storage.",
+  "action": {
+    "default_title": "Belot Auto Tracker"
+  },
+  "side_panel": {
+    "default_path": "popup.html"
+  },
+  "permissions": ["storage", "activeTab", "scripting", "sidePanel"],
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; script-src 'self'; object-src 'self'; img-src 'self' data: https: http:;"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
