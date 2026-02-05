@@ -64,6 +64,11 @@ const CARD_BY_ID = new Map(DECK.map((c) => [c.id, c]));
 const DECK_ROWS = RANKS.length;
 const DECK_COLS = SUITS.length;
 const DEFAULT_CARD_RATIO = 5 / 7;
+const SEEN_DISAPPEAR_MS = 1000;
+
+function clampNumber(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
 
 function compareCardIds(aId, bId) {
   const a = CARD_BY_ID.get(aId);
@@ -1972,10 +1977,14 @@ document.addEventListener("DOMContentLoaded", () => {
     cardRatio: null,
   };
 
+  document.documentElement.style.setProperty("--seen-disappear-ms", `${SEEN_DISAPPEAR_MS}ms`);
+
   /** @type {Map<string, {btn: HTMLButtonElement, badge: HTMLSpanElement, img: HTMLImageElement, text: HTMLSpanElement}>} */
   const deckUiById = new Map();
   /** @type {Map<string, HTMLDivElement>} */
   const suitColsByKey = new Map();
+  let deckResizeObserver = null;
+  let lastDeckSize = { width: 0, height: 0 };
 
 		  const debug = {
 		    lines: [],
@@ -2296,7 +2305,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const t = setTimeout(() => {
           ui.btn.classList.remove("seen-flash");
           ui.btn.classList.add("seen-hidden");
-        }, 1000);
+        }, SEEN_DISAPPEAR_MS);
         flashTimers.set(id, t);
       } else {
         ui.btn.classList.remove("seen-flash");
@@ -2705,42 +2714,72 @@ function resolveDeckIndex(cardId) {
     updateDeckSizing();
   }
 
-  function updateDeckSizing() {
+  function applyDeckSizing(width, height, force = false) {
     if (!els.deckGrid) return;
-    const deck = els.deckGrid;
-    const deckStyles = getComputedStyle(deck);
-    const gapX = parseFloat(deckStyles.columnGap || deckStyles.gap || "0") || 0;
-    const gapY = parseFloat(deckStyles.rowGap || deckStyles.gap || "0") || 0;
-    const padX =
-      (parseFloat(deckStyles.paddingLeft || "0") || 0) + (parseFloat(deckStyles.paddingRight || "0") || 0);
-    const padY =
-      (parseFloat(deckStyles.paddingTop || "0") || 0) + (parseFloat(deckStyles.paddingBottom || "0") || 0);
-    const deckWidth = deck.clientWidth - padX;
-    const deckHeight = deck.clientHeight - padY;
-    if (deckWidth <= 0 || deckHeight <= 0) return;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
+    if (
+      !force &&
+      Math.abs(width - lastDeckSize.width) < 0.5 &&
+      Math.abs(height - lastDeckSize.height) < 0.5
+    ) {
+      return;
+    }
+    lastDeckSize = { width, height };
+
+    const compact = height < 620;
+    const gapX = clampNumber(width * 0.02, compact ? 4 : 6, compact ? 8 : 12);
+    const gapY = clampNumber(height * 0.008, compact ? 2 : 3, compact ? 4 : 6);
+    const colPad = clampNumber(height * 0.01, compact ? 2 : 3, compact ? 5 : 7);
+    const suitSize = clampNumber(height * 0.028, compact ? 14 : 16, compact ? 20 : 24);
+    const panelPad = clampNumber(height * 0.02, compact ? 4 : 6, compact ? 8 : 10);
+    const appPad = clampNumber(height * 0.02, compact ? 4 : 6, compact ? 8 : 10);
+    const trumpSize = clampNumber(height * 0.03, compact ? 20 : 22, compact ? 26 : 30);
+
+    document.documentElement.style.setProperty("--panel-pad", `${panelPad}px`);
+    document.documentElement.style.setProperty("--app-pad", `${appPad}px`);
+    document.documentElement.style.setProperty("--trump-size", `${trumpSize}px`);
 
     const ratio = state.cardRatio || DEFAULT_CARD_RATIO;
-    const colWidth = (deckWidth - gapX * (DECK_COLS - 1)) / DECK_COLS;
+    const colWidth = (width - gapX * (DECK_COLS - 1)) / DECK_COLS - colPad * 2;
     const cardHFromWidth = colWidth / ratio;
+    const labelH = suitSize + 4;
+    const available = height - colPad * 2 - labelH - gapY * (DECK_ROWS - 1);
+    const cardHFromHeight = available / DECK_ROWS;
 
-    let cardHFromHeight = cardHFromWidth;
-    const firstCol = suitColsByKey.values().next().value || deck.querySelector(".deck-col");
-    if (firstCol) {
-      const colStyles = getComputedStyle(firstCol);
-      const colPadY =
-        (parseFloat(colStyles.paddingTop || "0") || 0) + (parseFloat(colStyles.paddingBottom || "0") || 0);
-      const colGap = parseFloat(colStyles.rowGap || colStyles.gap || "0") || 0;
-      const label = firstCol.querySelector(".suit-label");
-      const labelH = label ? label.getBoundingClientRect().height : 0;
-      const available = deckHeight - colPadY - labelH - colGap * (DECK_ROWS - 1);
-      cardHFromHeight = available / DECK_ROWS;
-    } else {
-      const available = deckHeight - gapY * (DECK_ROWS - 1);
-      cardHFromHeight = available / DECK_ROWS;
+    let cardH = Math.floor(Math.min(cardHFromWidth, cardHFromHeight));
+    cardH = clampNumber(cardH, compact ? 36 : 44, compact ? 86 : 110);
+    const cardW = Math.floor(cardH * ratio);
+
+    els.deckGrid.style.setProperty("--card-h", `${cardH}px`);
+    els.deckGrid.style.setProperty("--card-w", `${cardW}px`);
+    els.deckGrid.style.setProperty("--gap-x", `${gapX}px`);
+    els.deckGrid.style.setProperty("--gap-y", `${gapY}px`);
+    els.deckGrid.style.setProperty("--col-pad", `${colPad}px`);
+    els.deckGrid.style.setProperty("--suit-size", `${suitSize}px`);
+  }
+
+  function updateDeckSizing(force = false) {
+    if (!els.deckGrid) return;
+    const rect = els.deckGrid.getBoundingClientRect();
+    applyDeckSizing(rect.width, rect.height, force);
+  }
+
+  function initDeckResizeObserver() {
+    if (!els.deckGrid) return;
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", () => updateDeckSizing());
+      updateDeckSizing(true);
+      return;
     }
-
-    const cardH = Math.max(20, Math.floor(Math.min(cardHFromWidth, cardHFromHeight) - 2));
-    deck.style.setProperty("--card-h", `${cardH}px`);
+    if (deckResizeObserver) deckResizeObserver.disconnect();
+    deckResizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        applyDeckSizing(width, height);
+      }
+    });
+    deckResizeObserver.observe(els.deckGrid);
+    updateDeckSizing(true);
   }
 
   function buildSeenSearchIndex(card) {
@@ -3325,7 +3364,7 @@ function resolveDeckIndex(cardId) {
 
   initDeckGrid();
   loadState();
-  window.addEventListener("resize", () => updateDeckSizing());
+  initDeckResizeObserver();
 
   if (els.calibrateBtn) {
     els.calibrateBtn.addEventListener("click", () => {

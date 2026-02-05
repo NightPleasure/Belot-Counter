@@ -13,6 +13,16 @@
   --danger-weak: rgba(239, 68, 68, 0.12);
   --radius: 14px;
   --shadow: 0 14px 40px rgba(17, 24, 39, 0.12);
+  --app-pad: 8px;
+  --panel-pad: 8px;
+  --gap-x: 6px;
+  --gap-y: 4px;
+  --col-pad: 4px;
+  --card-w: 64px;
+  --card-h: 88px;
+  --suit-size: 18px;
+  --trump-size: 22px;
+  --seen-disappear-ms: 1000ms;
   --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
@@ -56,7 +66,7 @@ body {
 }
 
 .app {
-  padding: 10px;
+  padding: var(--app-pad);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -92,11 +102,11 @@ body {
 .panel.panel-main {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  padding: 8px;
+  padding: var(--panel-pad);
 }
 .row {
   display: flex;
@@ -111,6 +121,10 @@ body {
 .row-top {
   justify-content: space-between;
   margin-bottom: 6px;
+}
+
+.panel-main > .row-top {
+  display: none;
 }
 
 .row-controls {
@@ -226,7 +240,7 @@ body {
 .deck {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  gap: var(--gap-x);
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
@@ -261,13 +275,14 @@ body {
 
 .deck-col {
   display: grid;
-  grid-auto-rows: auto;
-  gap: 3px;
-  padding: 3px;
+  grid-template-rows: var(--suit-size) repeat(8, var(--card-h));
+  gap: var(--gap-y);
+  padding: var(--col-pad);
   border-radius: 12px;
   border: 1px solid color-mix(in srgb, var(--border), transparent 40%);
   background: color-mix(in srgb, var(--panel), #000 4%);
   min-width: 0;
+  align-content: start;
 }
 
 .deck-col.trump {
@@ -291,11 +306,14 @@ body {
 }
 
 .suit-label {
-  font-size: 19px;
+  font-size: var(--suit-size);
   font-weight: 900;
   font-family: var(--mono);
   text-align: center;
   letter-spacing: 0.5px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
 }
 
 .deck-col[data-suit="S"] .suit-label,
@@ -310,50 +328,31 @@ body {
 
 .card-btn {
   position: relative;
-  border: 1px solid color-mix(in srgb, var(--border), transparent 25%);
+  border: none;
   border-radius: 12px;
   padding: 0;
-  background: color-mix(in srgb, var(--panel), #000 8%);
+  background: transparent;
   color: var(--text);
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
   line-height: 1;
-  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  transition: transform 120ms ease;
   height: var(--card-h, auto);
   overflow: hidden;
   width: 100%;
 }
 
-@media (max-height: 780px) {
-  .deck {
-    gap: 4px;
-  }
-  .deck-col {
-    gap: 2px;
-    padding: 2px;
-  }
-  .suit-label {
-    font-size: 15px;
-  }
-  .trump-row {
-    margin: 0 0 4px;
-  }
-}
-
 .card-btn:hover {
-  border-color: color-mix(in srgb, var(--accent), var(--border) 50%);
-  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.18);
+  transform: none;
 }
 
 .card-btn.seen-flash {
-  border-color: color-mix(in srgb, var(--danger), var(--border) 40%);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger), transparent 65%);
+  box-shadow: none;
 }
 
 .card-btn.seen-hidden {
-  background: color-mix(in srgb, var(--panel), #000 12%);
-  border-color: color-mix(in srgb, var(--border), transparent 30%);
+  background: transparent;
 }
 
 .card-img {
@@ -364,7 +363,7 @@ body {
   object-fit: contain;
   opacity: 1;
   filter: none;
-  transition: opacity 2s ease, filter 200ms ease;
+  transition: opacity var(--seen-disappear-ms) ease, filter 200ms ease;
 }
 
 .card-btn.has-img .card-text {
@@ -388,7 +387,7 @@ body {
 
 .card-btn.seen-flash::after {
   opacity: 1;
-  animation: seenFlash 1s ease-out forwards;
+  animation: seenFlash var(--seen-disappear-ms) ease-out forwards;
 }
 
 .card-btn.seen-hidden::after {
@@ -436,34 +435,39 @@ body {
 }
 
 .trump-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin: 0 0 6px;
+  width: 100%;
 }
 
 .trump-label {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 800;
   color: var(--muted);
   min-width: 44px;
 }
 
 .trump-options {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+  width: 100%;
 }
 
 .trump-btn {
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 5px 8px;
-  font-size: 17px;
+  border-radius: 12px;
+  padding: 9px 0;
+  font-size: var(--trump-size);
   font-weight: 900;
   background: color-mix(in srgb, var(--panel), #000 6%);
   color: var(--text);
   cursor: pointer;
   transition: all 120ms ease;
+  width: 100%;
 }
 
 .trump-btn[data-suit="H"],
