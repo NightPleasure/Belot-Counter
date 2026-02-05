@@ -65,6 +65,10 @@ const DECK_ROWS = RANKS.length;
 const DECK_COLS = SUITS.length;
 const DEFAULT_CARD_RATIO = 5 / 7;
 const SEEN_DISAPPEAR_MS = 1000;
+const REFLOW_MS = 1100;
+const REFLOW_EASING = "cubic-bezier(0.16, 1, 0.3, 1)";
+const APPEAR_MS = 1350;
+const APPEAR_STAGGER_MS = 70;
 
 function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -1978,6 +1982,11 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   document.documentElement.style.setProperty("--seen-disappear-ms", `${SEEN_DISAPPEAR_MS}ms`);
+  document.documentElement.style.setProperty("--appear-ms", `${APPEAR_MS}ms`);
+  const prefersReducedMotion =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /** @type {Map<string, {btn: HTMLButtonElement, badge: HTMLSpanElement, img: HTMLImageElement, text: HTMLSpanElement}>} */
   const deckUiById = new Map();
@@ -1985,6 +1994,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const suitColsByKey = new Map();
   let deckResizeObserver = null;
   let lastDeckSize = { width: 0, height: 0 };
+  const reflowAnimations = new Map();
+  const pendingRemovals = new Set();
+  const appearTimers = new Map();
 
 		  const debug = {
 		    lines: [],
@@ -2279,37 +2291,124 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function animateReflow(items, firstRects) {
+    if (prefersReducedMotion) return;
+    for (const btn of items) {
+      const first = firstRects.get(btn);
+      if (!first) continue;
+      const last = btn.getBoundingClientRect();
+      const dx = first.left - last.left;
+      const dy = first.top - last.top;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
+      const prev = reflowAnimations.get(btn);
+      if (prev) prev.cancel();
+      const anim = btn.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px)` },
+          { transform: "translate(0, 0)" },
+        ],
+        { duration: REFLOW_MS, easing: REFLOW_EASING, fill: "both" }
+      );
+      anim.onfinish = () => reflowAnimations.delete(btn);
+      anim.oncancel = () => reflowAnimations.delete(btn);
+      reflowAnimations.set(btn, anim);
+    }
+  }
+
+  function collapseCardWithReflow(btn) {
+    if (!btn) return;
+    const col = btn.closest(".deck-col");
+    if (!col) {
+      btn.classList.add("seen-gone");
+      return;
+    }
+    const stay = Array.from(col.querySelectorAll(".card-btn")).filter(
+      (b) => !b.classList.contains("seen-gone") && b !== btn
+    );
+    const firstRects = new Map();
+    for (const b of stay) {
+      firstRects.set(b, b.getBoundingClientRect());
+    }
+    btn.classList.add("seen-gone");
+    requestAnimationFrame(() => {
+      animateReflow(stay, firstRects);
+    });
+  }
+
+  function triggerAppear(btn, delayMs) {
+    if (!btn || prefersReducedMotion) return;
+    const prev = reflowAnimations.get(btn);
+    if (prev) prev.cancel();
+    const timer = appearTimers.get(btn);
+    if (timer) clearTimeout(timer);
+    btn.classList.remove("appear");
+    btn.style.setProperty("--appear-delay", `${delayMs}ms`);
+    // Force reflow so animation restarts.
+    void btn.offsetWidth;
+    btn.classList.add("appear");
+    appearTimers.set(
+      btn,
+      setTimeout(() => {
+        btn.classList.remove("appear");
+        appearTimers.delete(btn);
+      }, APPEAR_MS + delayMs + 50),
+    );
+  }
+
+  function getAppearDelayForId(id) {
+    const card = CARD_BY_ID.get(id);
+    if (!card) return 0;
+    return card.rankOrder * APPEAR_STAGGER_MS;
+  }
+
   function updateDeckBadges(seenCounts) {
     for (const [id, ui] of deckUiById.entries()) {
       const count = seenCounts.get(id) ?? 0;
       const prev = lastSeenCounts.get(id) ?? 0;
-      const timer = flashTimers.get(id);
-      if (timer) {
-        clearTimeout(timer);
-        flashTimers.delete(id);
-      }
+      const timers = flashTimers.get(id);
+      const wasHidden = ui.btn.classList.contains("seen-gone") || ui.btn.classList.contains("seen-hidden");
 
       ui.badge.hidden = true;
       ui.badge.textContent = "";
 
       if (count <= 0) {
+        if (timers) {
+          clearTimeout(timers.remove);
+          flashTimers.delete(id);
+        }
+        pendingRemovals.delete(id);
         ui.btn.classList.remove("seen-flash");
         ui.btn.classList.remove("seen-hidden");
+        ui.btn.classList.remove("seen-gone");
+        if (prev > 0 || wasHidden) {
+          triggerAppear(ui.btn, getAppearDelayForId(id));
+        }
         lastSeenCounts.set(id, 0);
         continue;
       }
 
       if (count > prev) {
+        if (timers) {
+          clearTimeout(timers.remove);
+          flashTimers.delete(id);
+        }
+        pendingRemovals.add(id);
         ui.btn.classList.add("seen-flash");
-        ui.btn.classList.remove("seen-hidden");
-        const t = setTimeout(() => {
+        ui.btn.classList.add("seen-hidden");
+        ui.btn.classList.remove("seen-gone");
+        ui.btn.classList.remove("appear");
+        const remove = setTimeout(() => {
           ui.btn.classList.remove("seen-flash");
-          ui.btn.classList.add("seen-hidden");
+          pendingRemovals.delete(id);
+          collapseCardWithReflow(ui.btn);
         }, SEEN_DISAPPEAR_MS);
-        flashTimers.set(id, t);
+        flashTimers.set(id, { remove });
       } else {
         ui.btn.classList.remove("seen-flash");
         ui.btn.classList.add("seen-hidden");
+        if (!pendingRemovals.has(id)) {
+          ui.btn.classList.add("seen-gone");
+        }
       }
       lastSeenCounts.set(id, count);
     }
@@ -2693,12 +2792,16 @@ function resolveDeckIndex(cardId) {
     ensureCardImageCacheFromConfig();
     const best = buildCardImageMap();
     for (const [id, ui] of deckUiById.entries()) {
+      const hadImg = Boolean(ui.img.getAttribute("src"));
       const entry = best[id];
       const url = entry ? resolveCardImageUrl(entry.token) : null;
       if (url) {
         ui.img.src = url;
         ui.img.hidden = false;
         ui.btn.classList.add("has-img");
+        if (!hadImg) {
+          triggerAppear(ui.btn, getAppearDelayForId(id));
+        }
         if (!ui.img.dataset.ratioBound) {
           ui.img.dataset.ratioBound = "1";
           ui.img.addEventListener("load", () => {

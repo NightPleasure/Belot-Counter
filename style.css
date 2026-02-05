@@ -275,7 +275,9 @@ body {
 
 .deck-col {
   display: grid;
-  grid-template-rows: var(--suit-size) repeat(8, var(--card-h));
+  grid-template-rows: var(--suit-size);
+  grid-auto-rows: var(--card-h);
+  grid-auto-flow: row;
   gap: var(--gap-y);
   padding: var(--col-pad);
   border-radius: 12px;
@@ -373,6 +375,67 @@ body {
 .card-btn.seen-hidden .card-img {
   opacity: 0;
   filter: none;
+}
+
+.card-btn.seen-gone {
+  display: none;
+}
+
+.card-btn.appear {
+  animation: cardAppear var(--appear-ms, 1350ms) cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--appear-delay, 0ms);
+}
+
+@keyframes cardAppear {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  60% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card-btn.appear::before {
+  content: "";
+  position: absolute;
+  top: -40%;
+  left: -60%;
+  width: 60%;
+  height: 180%;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.0) 30%,
+    rgba(255, 255, 255, 0.45) 50%,
+    rgba(255, 255, 255, 0.0) 70%,
+    transparent 100%
+  );
+  transform: translateX(-140%) rotate(18deg);
+  opacity: 0;
+  pointer-events: none;
+  animation: cardShine calc(var(--appear-ms, 1350ms) * 0.9) ease-out both;
+}
+
+@keyframes cardShine {
+  0% {
+    transform: translateX(-140%) rotate(18deg);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.6;
+  }
+  70% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateX(180%) rotate(18deg);
+    opacity: 0;
+  }
 }
 
 .card-btn::after {
