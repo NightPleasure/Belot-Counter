@@ -2417,6 +2417,47 @@ function mapDeck1Token(token) {
   return DECK1_INDEX_TO_CARD[num] || null;
 }
 
+function buildAutoMapForDeck(basePath, ext) {
+  const out = {};
+  const safeBase = basePath.endsWith("/") ? basePath : `${basePath}/`;
+  const deckName = safeBase.split("/").filter(Boolean).pop() || "";
+  const altBase = safeBase.includes("/shadow/") ? safeBase.replace("/shadow/", "/") : "";
+
+  for (const [idxStr, cardId] of Object.entries(DECK1_INDEX_TO_CARD)) {
+    if (!cardId) continue;
+    const idx = Number.parseInt(idxStr, 10);
+    if (!Number.isFinite(idx)) continue;
+    const file = `${idx}.${ext || "png"}`;
+    const full = `${safeBase}${file}`;
+    out[full] = cardId;
+    if (deckName) out[`${deckName}/${file}`] = cardId;
+    if (altBase) out[`${altBase}${file}`] = cardId;
+    out[String(idx)] = cardId;
+  }
+  return out;
+}
+
+function autoCalibrateFromDeckAsset(state, persistFn, quiet = false) {
+  if (!state || !state.deckAssetBasePath) return false;
+  const existingCount = Object.keys(state.autoReadMap || {}).length;
+  if (existingCount >= 32) return false;
+  const ext = state.deckAssetExt || "png";
+  const nextMap = buildAutoMapForDeck(state.deckAssetBasePath, ext);
+  // Preserve any existing mappings, but fill missing.
+  state.autoReadMap = { ...nextMap, ...state.autoReadMap };
+  state.deckIndexSamples = { ...DECK1_INDEX_TO_CARD };
+  if (typeof persistFn === "function") {
+    persistFn({
+      autoReadMap: state.autoReadMap,
+      deckIndexSamples: state.deckIndexSamples,
+    });
+  }
+  if (!quiet && typeof logDebug === "function") {
+    logDebug("Auto-calibrare completă (mapare deck_1 aplicată).");
+  }
+  return true;
+}
+
 function getCustomDeckIndex(cardId) {
   if (!cardId) return null;
   const idx = CUSTOM_DECK_INDEX_MAP[String(cardId)];
@@ -3236,6 +3277,7 @@ function resolveDeckIndex(cardId) {
       state.deckAssetOrigin = typeof items.deckAssetOrigin === "string" ? items.deckAssetOrigin : "";
       state.deckAssetBasePath = typeof items.deckAssetBasePath === "string" ? items.deckAssetBasePath : "";
       state.deckAssetExt = typeof items.deckAssetExt === "string" ? items.deckAssetExt : "png";
+      const didAutoCalibrate = autoCalibrateFromDeckAsset(state, persist, true);
       state.trumpSuit = typeof items.trumpSuit === "string" ? items.trumpSuit : "";
       if (!state.deckIndexConfig) {
         state.deckIndexConfig = inferDeckIndexConfigFromSamples(state.deckIndexSamples);
@@ -3251,6 +3293,9 @@ function resolveDeckIndex(cardId) {
       els.autoReadSelector.value = state.autoReadSelector;
       updateMappingUi();
       updateDeckImages();
+      if (didAutoCalibrate) {
+        updateMappingUi();
+      }
       updateTrumpUi();
       lastSeenCounts.clear();
       const initialCounts = countOccurrences(state.seen);
@@ -3436,6 +3481,12 @@ function resolveDeckIndex(cardId) {
           deckAssetExt: state.deckAssetExt,
         });
         updateDeckImages();
+        const didAuto = autoCalibrateFromDeckAsset(state, persist, true);
+        if (didAuto) {
+          updateMappingUi();
+          updateDeckImages();
+          startAutoRead({ quiet: true });
+        }
       }
     }
 	    const scriptVersion = typeof message.scriptVersion === "string" ? message.scriptVersion : "";
@@ -3630,6 +3681,11 @@ function resolveDeckIndex(cardId) {
         typeof changes.deckAssetOrigin.newValue === "string" ? changes.deckAssetOrigin.newValue : "";
       mergeCardImageCacheFromSamples(isDeckSamplesComplete(state.deckIndexSamples));
       updateDeckImages();
+      if (autoCalibrateFromDeckAsset(state, persist, true)) {
+        updateMappingUi();
+        updateDeckImages();
+        startAutoRead({ quiet: true });
+      }
     }
 
     if (changes.deckAssetBasePath) {
@@ -3637,12 +3693,22 @@ function resolveDeckIndex(cardId) {
         typeof changes.deckAssetBasePath.newValue === "string" ? changes.deckAssetBasePath.newValue : "";
       mergeCardImageCacheFromSamples(isDeckSamplesComplete(state.deckIndexSamples));
       updateDeckImages();
+      if (autoCalibrateFromDeckAsset(state, persist, true)) {
+        updateMappingUi();
+        updateDeckImages();
+        startAutoRead({ quiet: true });
+      }
     }
 
     if (changes.deckAssetExt) {
       state.deckAssetExt = typeof changes.deckAssetExt.newValue === "string" ? changes.deckAssetExt.newValue : "png";
       mergeCardImageCacheFromSamples(isDeckSamplesComplete(state.deckIndexSamples));
       updateDeckImages();
+      if (autoCalibrateFromDeckAsset(state, persist, true)) {
+        updateMappingUi();
+        updateDeckImages();
+        startAutoRead({ quiet: true });
+      }
     }
 
     if (changes.trumpSuit) {
