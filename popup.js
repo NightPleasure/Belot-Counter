@@ -276,6 +276,12 @@ function normalizeImportedData(data) {
   const incomingVersion = typeof opts.scriptVersion === "string" ? opts.scriptVersion : "";
   const ATTRS = ["aria-label", "title", "alt", "data-card", "data-value", "src", "srcset", "data-src", "data-srcset"];
   const map = opts.map && typeof opts.map === "object" ? opts.map : {};
+  const TRUMP_ID_TO_SUIT = {
+    Path_229: "D", // doba / ♦
+    Path_232: "H", // rosu / ♥
+    Path_226: "S", // verde / ♠
+    Path_231: "C", // cruce / ♣
+  };
 
   function isValidCardId(id) {
     return typeof id === "string" && /^(S|H|D|C)(7|8|9|10|J|Q|K|A)$/.test(id);
@@ -289,6 +295,14 @@ function normalizeImportedData(data) {
     const opacity = Number(style.opacity);
     if (Number.isFinite(opacity) && opacity <= 0) return false;
     return style.display !== "none" && style.visibility !== "hidden";
+  }
+
+  function detectTrumpFromSvg() {
+    for (const [id, suit] of Object.entries(TRUMP_ID_TO_SUIT)) {
+      const el = document.querySelector(`path#${id}`);
+      if (el && isElementVisible(el)) return suit;
+    }
+    return null;
   }
 
   function tokenFromUrl(urlLike) {
@@ -517,6 +531,9 @@ function normalizeImportedData(data) {
   }
   if (typeof state.sessionEndSent !== "boolean") {
     state.sessionEndSent = false;
+  }
+  if (typeof state.lastTrumpSent !== "string") {
+    state.lastTrumpSent = "";
   }
   if (typeof state.lastCardsSeenAt !== "number") {
     state.lastCardsSeenAt = 0;
@@ -1060,6 +1077,12 @@ function normalizeImportedData(data) {
 
     const roundOverlay = document.querySelector(".table__round-table");
     const roundOverlayVisible = isElementVisible(roundOverlay);
+
+    const trumpSuit = detectTrumpFromSvg();
+    if (trumpSuit && trumpSuit !== state.lastTrumpSent) {
+      state.lastTrumpSent = trumpSuit;
+      chrome.runtime.sendMessage({ type: "belot_auto_tracker/trump", suit: trumpSuit });
+    }
     if (roundOverlayVisible && !state.roundOverlaySeen) {
       state.roundOverlaySeen = true;
       state.pauseUntilNoCards = true;
@@ -3559,6 +3582,16 @@ function resolveDeckIndex(cardId) {
     const nextHidden = !els.autoPanel.hidden ? true : false;
     els.autoPanel.hidden = nextHidden;
     logDebug(nextHidden ? "Panou avansat ascuns." : "Panou avansat afișat.");
+  });
+
+  chrome.runtime.onMessage.addListener((message) => {
+    if (!message || message.type !== "belot_auto_tracker/trump") return;
+    const suit = typeof message.suit === "string" ? message.suit.toUpperCase() : "";
+    if (["S", "H", "D", "C"].includes(suit)) {
+      state.trumpSuit = suit;
+      persist({ trumpSuit: state.trumpSuit });
+      updateTrumpUi();
+    }
   });
 
   chrome.runtime.onMessage.addListener((message) => {
