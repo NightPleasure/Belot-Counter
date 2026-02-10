@@ -373,7 +373,7 @@ body {
 }
 
 .card-btn.seen-hidden .card-img {
-  opacity: 0;
+  opacity: 1;
   filter: none;
 }
 
@@ -388,7 +388,7 @@ body {
 
 @keyframes cardAppear {
   0% {
-    opacity: 0;
+    opacity: 1;
     transform: translateY(-14px);
   }
   60% {
@@ -498,13 +498,9 @@ body {
 }
 
 .trump-row {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 6px;
-  width: 100%;
+  display: none !important;
 }
+
 
 .trump-label {
   font-size: 14px;
@@ -786,4 +782,8 @@ body {
 
 .token-chip:active {
   transform: translateY(1px);
+}
+
+.panel-main .row-top {
+  display: none !important;
 }
