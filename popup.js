@@ -36,9 +36,6 @@ const RANKS = [
   { key: "A", label: "A", order: 7 },
 ];
 
-const TRUMP_RANK_SEQUENCE = ["7", "8", "Q", "K", "10", "A", "9", "J"];
-const TRUMP_RANK_INDEX = new Map(TRUMP_RANK_SEQUENCE.map((r, i) => [r, i]));
-
 function buildDeck() {
   /** @type {Array<{id: string, suitKey: string, suitSymbol: string, suitName: string, suitAliases: string[], suitOrder: number, rankKey: string, rankLabel: string, rankOrder: number, label: string}>} */
   const deck = [];
@@ -1081,6 +1078,11 @@ function normalizeImportedData(data) {
     const roundOverlay = document.querySelector(".table__round-table");
     const roundOverlayVisible = isElementVisible(roundOverlay);
 
+    const trumpSuit = detectTrumpFromSvg();
+    if (trumpSuit && trumpSuit !== state.lastTrumpSent) {
+      state.lastTrumpSent = trumpSuit;
+      chrome.runtime.sendMessage({ type: "belot_auto_tracker/trump", suit: trumpSuit });
+    }
     if (roundOverlayVisible && !state.roundOverlaySeen) {
       state.roundOverlaySeen = true;
       state.pauseUntilNoCards = true;
@@ -1205,12 +1207,6 @@ function normalizeImportedData(data) {
       }
     } catch {
       // ignore
-    }
-
-    const trumpSuit = foundSet.size > 0 ? detectTrumpFromSvg() : null;
-    if (foundSet.size > 0 && trumpSuit && trumpSuit !== state.lastTrumpSent) {
-      state.lastTrumpSent = trumpSuit;
-      chrome.runtime.sendMessage({ type: "belot_auto_tracker/trump", suit: trumpSuit });
     }
 
     const found = Array.from(foundSet);
@@ -2251,7 +2247,6 @@ document.addEventListener("DOMContentLoaded", () => {
       suitLabel.className = "suit-label";
       suitLabel.textContent = suit.symbol;
       suitLabel.title = suit.name;
-      suitLabel.style.order = "0";
       col.appendChild(suitLabel);
       suitColsByKey.set(suit.key, col);
 
@@ -2263,7 +2258,6 @@ document.addEventListener("DOMContentLoaded", () => {
         btn.type = "button";
         btn.className = "card-btn";
         btn.dataset.cardId = id;
-        btn.style.order = String(rank.order + 1);
         btn.setAttribute("aria-label", card ? `Adaugă ${card.label}` : `Adaugă ${id}`);
 
         const img = document.createElement("img");
@@ -2289,7 +2283,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       els.deckGrid.appendChild(col);
     }
-    updateCardOrder();
   }
 
   function updateRemaining(uniqueSeenIds) {
@@ -3021,21 +3014,6 @@ function resolveDeckIndex(cardId) {
     }
     for (const [suitKey, col] of suitColsByKey.entries()) {
       col.classList.toggle("trump", Boolean(state.trumpSuit && suitKey === state.trumpSuit));
-    }
-    updateCardOrder();
-  }
-
-  function updateCardOrder() {
-    for (const col of suitColsByKey.values()) {
-      const label = col.querySelector(".suit-label");
-      if (label) label.style.order = "0";
-    }
-    for (const [id, ui] of deckUiById.entries()) {
-      const card = CARD_BY_ID.get(id);
-      if (!card) continue;
-      const isTrump = Boolean(state.trumpSuit && card.suitKey === state.trumpSuit);
-      const rankOrder = isTrump ? (TRUMP_RANK_INDEX.get(card.rankKey) ?? card.rankOrder) : card.rankOrder;
-      ui.btn.style.order = String(rankOrder + 1);
     }
   }
 
